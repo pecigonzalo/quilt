@@ -241,6 +241,7 @@ workflows:
                 - preview
                 - s3select
                 - thumbnail
+                - transcode
                 - pkgselect
                 - shared
                 - pkgevents
