@@ -7,6 +7,14 @@
 ## Catalog, Lambdas
 !-->
 
+# unreleased - YYYY-MM-DD
+## Python API
+
+## CLI
+
+## Catalog, Lambdas
+* [Added] Add a "transcode" lambda for previewing video files
+
 # 3.6.0 - 2021-10-15
 ## Python API
 * [Added] Validation of package names with `handle_pattern` in [workflows](advanced-features/workflows.md) config.
