@@ -13,7 +13,7 @@
 ## CLI
 
 ## Catalog, Lambdas
-* [Added] Add a "transcode" lambda for previewing video files
+* [Added] Add a "transcode" lambda for previewing video files ([#2366](https://github.com/quiltdata/quilt/pull/2366/)
 
 # 3.6.0 - 2021-10-15
 ## Python API
