@@ -93,7 +93,7 @@
     "katex": "^0.13.11",
     "lodash": "^4.17.21",
     "match-sorter": "^6.3.0",
-    "mime-types": "^2.1.30",
+    "mime-types": "^2.1.33",
     "minimist": "^1.2.5",
     "mixpanel-browser": "^2.41.0",
     "monocle-ts": "^2.3.10",
