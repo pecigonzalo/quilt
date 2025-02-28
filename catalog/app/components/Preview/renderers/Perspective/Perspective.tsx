@@ -16,7 +16,7 @@ const useParquetMetaStyles = M.makeStyles((t) => ({
     margin: t.spacing(1, 0, 1, 3),
   },
   mono: {
-    fontFamily: (t.typography as $TSFixMe).monospace.fontFamily,
+    fontFamily: t.typography.monospace.fontFamily,
   },
   metaName: {
     paddingRight: t.spacing(1),
@@ -98,7 +98,6 @@ function ParquetMeta({
               </span>
             ))}
             {renderMeta('Schema:', schema, (s: { names: string[] }) => (
-              /* @ts-expect-error */
               <JsonDisplay value={s} />
             ))}
           </tbody>
@@ -245,7 +244,6 @@ export default function Perspective({
         onLoadMore={onLoadMore}
         truncated={truncated}
       />
-      {/* @ts-expect-error */}
       {!!packageMeta && <JsonDisplay className={classes.meta} value={packageMeta} />}
       {!!parquetMeta && <ParquetMeta className={classes.meta} {...parquetMeta} />}
       {children}

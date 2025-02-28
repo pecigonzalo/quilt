@@ -2,10 +2,10 @@ import * as React from 'react'
 import * as RRDom from 'react-router-dom'
 
 import type * as Model from 'model'
+import { isQuickPreviewAvailable } from 'components/Preview/quick'
 import * as AddToPackage from 'containers/AddToPackage'
 import * as NamedRoutes from 'utils/NamedRoutes'
 import parseSearch from 'utils/parseSearch'
-import type { S3HandleBase } from 'utils/s3paths'
 
 import { detect, useWriteData } from './loader'
 import { EditorInputType } from './types'
@@ -15,6 +15,7 @@ function useRedirect() {
   const history = RRDom.useHistory()
   const { urls } = NamedRoutes.use()
   const location = RRDom.useLocation()
+  // TODO: put this into FileEditor/routes
   const { add, next } = parseSearch(location.search, true)
   return React.useCallback(
     ({ bucket, key, size, version }: Model.S3File) => {
@@ -33,14 +34,16 @@ export interface EditorState {
   onCancel: () => void
   onChange: (value: string) => void
   onEdit: (type: EditorInputType | null) => void
+  onPreview: ((p: boolean) => void) | null
   onSave: () => Promise<Model.S3File | void>
+  preview: boolean
   saving: boolean
   types: EditorInputType[]
   value?: string
 }
 
 // TODO: use Provider
-export function useState(handle: S3HandleBase): EditorState {
+export function useState(handle: Model.S3.S3ObjectLocation): EditorState {
   const types = React.useMemo(() => detect(handle.key), [handle.key])
   const location = RRDom.useLocation()
   const { edit } = parseSearch(location.search, true)
@@ -49,6 +52,7 @@ export function useState(handle: S3HandleBase): EditorState {
   const [editing, setEditing] = React.useState<EditorInputType | null>(
     edit ? types[0] : null,
   )
+  const [preview, setPreview] = React.useState<boolean>(false)
   const [saving, setSaving] = React.useState<boolean>(false)
   const writeFile = useWriteData(handle)
   const redirect = useRedirect()
@@ -81,11 +85,13 @@ export function useState(handle: S3HandleBase): EditorState {
       onCancel,
       onChange: setValue,
       onEdit: setEditing,
+      onPreview: isQuickPreviewAvailable(editing) ? setPreview : null,
       onSave,
+      preview,
       saving,
       types,
       value,
     }),
-    [editing, error, onCancel, onSave, saving, types, value],
+    [editing, error, onCancel, onSave, preview, saving, types, value],
   )
 }

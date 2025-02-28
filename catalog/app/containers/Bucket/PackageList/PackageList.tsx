@@ -1,5 +1,6 @@
 import cx from 'classnames'
 import * as dateFns from 'date-fns'
+import invariant from 'invariant'
 import * as jsonpath from 'jsonpath'
 import * as R from 'ramda'
 import * as React from 'react'
@@ -8,11 +9,13 @@ import * as M from '@material-ui/core'
 import { fade } from '@material-ui/core/styles'
 import type { ResultOf } from '@graphql-typed-document-node/core'
 
+import * as Buttons from 'components/Buttons'
 import JsonDisplay from 'components/JsonDisplay'
 import Skeleton from 'components/Skeleton'
 import Sparkline from 'components/Sparkline'
 import * as Model from 'model'
 import * as BucketPreferences from 'utils/BucketPreferences'
+import * as GQL from 'utils/GraphQL'
 import MetaTitle from 'utils/MetaTitle'
 import * as NamedRoutes from 'utils/NamedRoutes'
 import * as SVG from 'utils/SVG'
@@ -24,7 +27,6 @@ import { readableQuantity } from 'utils/string'
 import { JsonRecord } from 'utils/types'
 import useDebouncedInput from 'utils/useDebouncedInput'
 import usePrevious from 'utils/usePrevious'
-import useQuery from 'utils/useQuery'
 
 import * as PD from '../PackageDialog'
 import Pagination from '../Pagination'
@@ -51,7 +53,7 @@ const SORT_OPTIONS = [
   },
 ] as const
 
-type SortMode = typeof SORT_OPTIONS[number]['key']
+type SortMode = (typeof SORT_OPTIONS)[number]['key']
 
 const DEFAULT_SORT = SORT_OPTIONS[0]
 
@@ -224,29 +226,36 @@ interface RevisionMetaProps {
 
 function RevisionMeta({ revision }: RevisionMetaProps) {
   const classes = useRevisionMetaStyles()
-  const { preferences } = BucketPreferences.use()
+  const { prefs } = BucketPreferences.use()
   return (
     <div className={classes.root}>
       {!!revision.message && <div className={classes.section}>{revision.message}</div>}
       {!!revision.userMeta && (
         <div className={classes.section}>
-          {preferences?.ui.packageDescription.userMetaMultiline ? (
-            Object.entries(revision.userMeta).map(([name, value]) => (
-              // @ts-expect-error
-              <JsonDisplay
-                className={cx({ [classes.sectionWithToggle]: typeof value === 'object' })}
-                key={`user-meta-section-${name}`}
-                name={name}
-                value={value}
-              />
-            ))
-          ) : (
-            // @ts-expect-error
-            <JsonDisplay
-              className={classes.sectionWithToggle}
-              name="User metadata"
-              value={revision.userMeta}
-            />
+          {BucketPreferences.Result.match(
+            {
+              Ok: ({ ui: { packageDescription } }) =>
+                packageDescription.userMetaMultiline ? (
+                  Object.entries(revision.userMeta!).map(([name, value]) => (
+                    <JsonDisplay
+                      className={cx({
+                        [classes.sectionWithToggle]: typeof value === 'object',
+                      })}
+                      key={`user-meta-section-${name}`}
+                      name={name}
+                      value={value}
+                    />
+                  ))
+                ) : (
+                  <JsonDisplay
+                    className={classes.sectionWithToggle}
+                    name="User metadata"
+                    value={revision.userMeta}
+                  />
+                ),
+              _: () => null,
+            },
+            prefs,
           )}
         </div>
       )}
@@ -267,15 +276,25 @@ function filterObjectByJsonPaths(obj: JsonRecord, jsonPaths: readonly string[]) 
 function usePackageDescription(
   name: string,
 ): BucketPreferences.PackagePreferences | null {
-  const { preferences } = BucketPreferences.use()
-  return React.useMemo(() => {
-    if (!preferences?.ui.packageDescription.packages) return null
-    return (
-      Object.entries(preferences?.ui.packageDescription.packages)
-        .reverse() // The last found config wins
-        .find(([nameRegex]) => new RegExp(nameRegex).test(name))?.[1] || {}
-    )
-  }, [name, preferences])
+  const { prefs } = BucketPreferences.use()
+  return React.useMemo(
+    () =>
+      BucketPreferences.Result.match(
+        {
+          Ok: ({ ui: { packageDescription } }) => {
+            if (!packageDescription.packages) return null
+            return (
+              Object.entries(packageDescription.packages)
+                .reverse() // The last found config wins
+                .find(([nameRegex]) => new RegExp(nameRegex).test(name))?.[1] || {}
+            )
+          },
+          _: () => null,
+        },
+        prefs,
+      ),
+    [name, prefs],
+  )
 }
 
 interface SelectiveMeta {
@@ -534,25 +553,19 @@ function PackageList({ bucket, sort, filter, page }: PackageListProps) {
   const computedFilter = filter || ''
   const filtering = useDebouncedInput(computedFilter, 500)
 
-  const totalCountQuery = useQuery({
-    query: PACKAGE_COUNT_QUERY,
-    variables: { bucket, filter: null },
+  const totalCountQuery = GQL.useQuery(PACKAGE_COUNT_QUERY, { bucket, filter: null })
+
+  const filteredCountQuery = GQL.useQuery(PACKAGE_COUNT_QUERY, {
+    bucket,
+    filter: filter || null,
   })
 
-  const filteredCountQuery = useQuery({
-    query: PACKAGE_COUNT_QUERY,
-    variables: { bucket, filter: filter || null },
-  })
-
-  const packagesQuery = useQuery({
-    query: PACKAGE_LIST_QUERY,
-    variables: {
-      bucket,
-      filter: filter || null,
-      order: computedSort.value,
-      page: computedPage,
-      perPage: PER_PAGE,
-    },
+  const packagesQuery = GQL.useQuery(PACKAGE_LIST_QUERY, {
+    bucket,
+    filter: filter || null,
+    order: computedSort.value,
+    page: computedPage,
+    perPage: PER_PAGE,
   })
 
   const makeSortUrl = React.useCallback(
@@ -600,7 +613,7 @@ function PackageList({ bucket, sort, filter, page }: PackageListProps) {
     }
   })
 
-  const { preferences } = BucketPreferences.use()
+  const { prefs } = BucketPreferences.use()
 
   const createDialog = PD.usePackageCreationDialog({
     bucket,
@@ -622,7 +635,7 @@ function PackageList({ bucket, sort, filter, page }: PackageListProps) {
         title: 'Create package',
       })}
 
-      {totalCountQuery.case({
+      {GQL.fold(totalCountQuery, {
         fetching: () => (
           <M.Box pb={{ xs: 0, sm: 5 }} mx={{ xs: -2, sm: 0 }}>
             <M.Box mt={{ xs: 0, sm: 3 }} display="flex" justifyContent="space-between">
@@ -664,24 +677,32 @@ function PackageList({ bucket, sort, filter, page }: PackageListProps) {
               <M.Box pt={5} textAlign="center">
                 <M.Typography variant="h4">No packages</M.Typography>
                 <M.Box pt={3} />
-                {preferences?.ui?.actions?.createPackage && (
-                  <>
-                    <M.Button
-                      variant="contained"
-                      color="primary"
-                      onClick={openPackageCreationDialog}
-                    >
-                      Create package
-                    </M.Button>
-                    <M.Box pt={2} />
-                    <M.Typography>
-                      Or{' '}
-                      <StyledLink href={EXAMPLE_PACKAGE_URL} target="_blank">
-                        push a package
-                      </StyledLink>{' '}
-                      with the Quilt Python API.
-                    </M.Typography>
-                  </>
+                {BucketPreferences.Result.match(
+                  {
+                    Ok: ({ ui: { actions } }) =>
+                      actions.createPackage && (
+                        <>
+                          <M.Button
+                            variant="contained"
+                            color="primary"
+                            onClick={openPackageCreationDialog}
+                          >
+                            Create package
+                          </M.Button>
+                          <M.Box pt={2} />
+                          <M.Typography>
+                            Or{' '}
+                            <StyledLink href={EXAMPLE_PACKAGE_URL} target="_blank">
+                              push a package
+                            </StyledLink>{' '}
+                            with the Quilt Python API.
+                          </M.Typography>
+                        </>
+                      ),
+                    Pending: () => <Buttons.Skeleton />,
+                    Init: () => null,
+                  },
+                  prefs,
                 )}
               </M.Box>
             )
@@ -718,18 +739,30 @@ function PackageList({ bucket, sort, filter, page }: PackageListProps) {
                   />
                 </M.Box>
                 <M.Box flexGrow={1} display={{ xs: 'none', sm: 'block' }} />
-                {preferences?.ui?.actions?.createPackage && (
-                  <M.Box display={{ xs: 'none', sm: 'block' }} pr={1}>
-                    <M.Button
-                      variant="contained"
-                      size="large"
-                      color="primary"
-                      style={{ paddingTop: 7, paddingBottom: 7 }}
-                      onClick={openPackageCreationDialog}
-                    >
-                      Create package
-                    </M.Button>
-                  </M.Box>
+                {BucketPreferences.Result.match(
+                  {
+                    Ok: ({ ui: { actions } }) =>
+                      actions.createPackage && (
+                        <M.Box display={{ xs: 'none', sm: 'block' }} pr={1}>
+                          <M.Button
+                            variant="contained"
+                            size="large"
+                            color="primary"
+                            style={{ paddingTop: 7, paddingBottom: 7 }}
+                            onClick={openPackageCreationDialog}
+                          >
+                            Create package
+                          </M.Button>
+                        </M.Box>
+                      ),
+                    Pending: () => (
+                      <M.Box display={{ xs: 'none', sm: 'block' }} pr={1}>
+                        <Buttons.Skeleton size="large" />
+                      </M.Box>
+                    ),
+                    Init: () => null,
+                  },
+                  prefs,
                 )}
                 <M.Box component={M.Paper} className={classes.paper}>
                   <SortDropdown
@@ -740,7 +773,7 @@ function PackageList({ bucket, sort, filter, page }: PackageListProps) {
                 </M.Box>
               </M.Box>
 
-              {filteredCountQuery.case({
+              {GQL.fold(filteredCountQuery, {
                 fetching: () => R.range(0, 10).map((i) => <PackageSkel key={i} />),
                 error: displayError(),
                 data: (filteredCountData) => {
@@ -768,7 +801,7 @@ function PackageList({ bucket, sort, filter, page }: PackageListProps) {
 
                   return (
                     <>
-                      {packagesQuery.case({
+                      {GQL.fold(packagesQuery, {
                         fetching: () => {
                           const items =
                             computedPage < pages ? PER_PAGE : filteredCount % PER_PAGE
@@ -795,12 +828,11 @@ function PackageList({ bucket, sort, filter, page }: PackageListProps) {
   )
 }
 
-export default function PackageListWrapper({
-  match: {
-    params: { bucket },
-  },
-  location,
-}: RRDom.RouteComponentProps<{ bucket: string }>) {
+export default function PackageListWrapper() {
+  const { bucket } = RRDom.useParams<{ bucket: string }>()
+  const location = RRDom.useLocation()
+  invariant(!!bucket, '`bucket` must be defined')
+
   const { sort, filter, p } = parseSearch(location.search, true)
   const page = p ? parseInt(p, 10) : undefined
   return (

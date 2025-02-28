@@ -8,7 +8,7 @@ import {
   JsonSchema,
   doesTypeMatchSchema,
   schemaTypeToHumanString,
-} from 'utils/json-schema'
+} from 'utils/JSONSchema'
 import { printObject } from 'utils/string'
 
 import {
@@ -27,12 +27,14 @@ interface TypeHelpArgs {
 }
 
 function getExamples(examples: JsonValue[]) {
-  if (examples.length > 1)
-    return [
-      'Examples:',
-      ...examples.map((example) => <Code>{printObject(example)}</Code>),
-    ]
-  return ['Example:', <Code>{printObject(examples[0])}</Code>]
+  const title = `Example${examples.length ? 's' : ''}:`
+  return [
+    title,
+    ...examples.map((example, i) => {
+      const str = printObject(example)
+      return <Code key={str + i}>{str}</Code>
+    }),
+  ]
 }
 
 function getTypeHelps({ errors, humanReadableSchema, mismatch, schema }: TypeHelpArgs) {
@@ -104,7 +106,7 @@ interface NoteValueProps {
 const useNoteValueStyles = M.makeStyles((t) => ({
   default: {
     color: t.palette.divider,
-    fontFamily: (t.typography as $TSFixMe).monospace.fontFamily,
+    fontFamily: t.typography.monospace.fontFamily,
     fontSize: t.typography.caption.fontSize,
     display: 'flex',
     '&:hover': {

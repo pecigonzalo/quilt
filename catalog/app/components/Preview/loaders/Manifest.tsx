@@ -1,16 +1,20 @@
+import { extname } from 'path'
+
 import hljs from 'highlight.js'
 import * as R from 'ramda'
 import * as React from 'react'
 
+import type * as Model from 'model'
 import AsyncResult from 'utils/AsyncResult'
-import type { S3HandleBase } from 'utils/s3paths'
 
 import { PreviewData, PreviewError } from '../types'
 
 import * as Text from './Text'
 import * as utils from './utils'
 
-export const detect = R.startsWith('.quilt/packages/')
+const hasNoExt = (key: string) => !extname(key)
+
+export const detect = R.allPass([R.startsWith('.quilt/packages/'), hasNoExt])
 
 const hl = (language: string) => (contents: string) =>
   hljs.highlight(contents, { language }).value
@@ -29,7 +33,7 @@ interface PreviewResult {
 interface LoaderProps {
   gated: boolean
   children: (result: $TSFixMe) => React.ReactNode
-  handle: S3HandleBase
+  handle: Model.S3.S3ObjectLocation
 }
 
 export const Loader = function ManifestLoader({ gated, handle, children }: LoaderProps) {
@@ -45,14 +49,13 @@ export const Loader = function ManifestLoader({ gated, handle, children }: Loade
         const [meta, ...entries] = [...data.head, ...data.tail]
         const packageMeta = meta ? JSON.parse(meta) : {}
         const packageEntries = R.map(
-          R.pipe(
-            JSON.parse,
-            R.evolve({
-              hash: R.prop('value'),
-              meta: JSON.stringify,
-              physical_keys: R.join(', '),
-            }),
-          ),
+          R.pipe(JSON.parse, ({ hash, ...e }) => ({
+            ...e,
+            physical_keys: e.physical_keys.join(', '),
+            'hash.type': hash.type,
+            'hash.value': hash.value,
+            meta: JSON.stringify(e.meta),
+          })),
           entries,
         )
         return PreviewData.Perspective({ packageMeta, data: packageEntries })

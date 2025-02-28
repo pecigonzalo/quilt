@@ -28,7 +28,7 @@ const useBookmarksItemStyles = M.makeStyles((t) => ({
 }))
 
 interface BookmarkItemProps {
-  handle: s3paths.S3HandleBase
+  handle: Model.S3.S3ObjectLocation
   onRemove: () => void
 }
 
@@ -82,7 +82,11 @@ function NoBookmarks() {
 function useHeadFile() {
   const s3: S3 = AWS.S3.use()
   return React.useCallback(
-    async ({ bucket, key, version }: s3paths.S3HandleBase): Promise<Model.S3File> => {
+    async ({
+      bucket,
+      key,
+      version,
+    }: Model.S3.S3ObjectLocation): Promise<Model.S3File> => {
       const { ContentLength: size } = await s3
         .headObject({ Bucket: bucket, Key: key, VersionId: version })
         .promise()
@@ -100,10 +104,10 @@ function isBucketListingResult(
 
 function useHandlesToS3Files(
   bucketListing: (r: $TSFixMe) => Promise<BucketListingResult>,
-  headFile: (h: s3paths.S3HandleBase) => Promise<Model.S3File>,
+  headFile: (h: Model.S3.S3ObjectLocation) => Promise<Model.S3File>,
 ) {
   return React.useCallback(
-    async (handles: s3paths.S3HandleBase[]) => {
+    async (handles: Model.S3.S3ObjectLocation[]) => {
       const requests = handles.map((handle) =>
         s3paths.isDir(handle.key)
           ? bucketListing({
@@ -162,12 +166,12 @@ const useDrawerStyles = M.makeStyles((t) => ({
 
 interface DrawerProps {
   error: Error | null
-  handles: s3paths.S3HandleBase[]
+  handles: Model.S3.S3ObjectLocation[]
   loading: boolean
   onClose?: () => void
   onPackage?: () => void
   open?: boolean
-  onRemove: (handle: s3paths.S3HandleBase) => void
+  onRemove: (handle: Model.S3.S3ObjectLocation) => void
   onClear: () => void
 }
 
@@ -190,7 +194,11 @@ function Drawer({
           {handles.length ? (
             <M.List dense>
               {handles.map((handle) => (
-                <BookmarkItem handle={handle} onRemove={() => onRemove(handle)} />
+                <BookmarkItem
+                  handle={handle}
+                  onRemove={() => onRemove(handle)}
+                  key={handle.bucket + handle.key}
+                />
               ))}
             </M.List>
           ) : (
@@ -230,14 +238,14 @@ function Drawer({
 }
 
 interface SidebarProps {
+  bookmarks: NonNullable<ReturnType<typeof useBookmarks>>
   bucket?: string
 }
 
-export default function Sidebar({ bucket = '' }: SidebarProps) {
-  const bookmarks = useBookmarks()
+export default function Sidebar({ bookmarks, bucket = '' }: SidebarProps) {
   const addToPackage = AddToPackage.use()
-  const entries = bookmarks?.groups.main.entries
-  const handles: s3paths.S3HandleBase[] = React.useMemo(
+  const entries = bookmarks.groups.main.entries
+  const handles: Model.S3.S3ObjectLocation[] = React.useMemo(
     () => (entries ? Object.values(entries) : []),
     [entries],
   )
@@ -252,16 +260,16 @@ export default function Sidebar({ bucket = '' }: SidebarProps) {
     disableStateDisplay: true,
   })
   const handleRemove = React.useCallback(
-    (handle: s3paths.S3HandleBase) => {
+    (handle: Model.S3.S3ObjectLocation) => {
       const isLastBookmark = handles.length === 1
-      bookmarks?.remove('main', handle)
-      if (isLastBookmark) bookmarks?.hide()
+      bookmarks.remove('main', handle)
+      if (isLastBookmark) bookmarks.hide()
     },
     [bookmarks, handles],
   )
   const handleClear = React.useCallback(() => {
-    bookmarks?.clear('main')
-    bookmarks?.hide()
+    bookmarks.clear('main')
+    bookmarks.hide()
   }, [bookmarks])
   const handleSubmit = React.useCallback(async () => {
     if (!addToPackage) throw new Error('Add to Package is not ready')
@@ -271,7 +279,7 @@ export default function Sidebar({ bucket = '' }: SidebarProps) {
       addToPackage?.merge(files)
       setTraversing(false)
       createDialog.open()
-      bookmarks?.hide()
+      bookmarks.hide()
     } catch (e) {
       if (e instanceof Error) {
         setTraversing(false)
@@ -287,11 +295,11 @@ export default function Sidebar({ bucket = '' }: SidebarProps) {
         error={error}
         handles={handles}
         loading={traversing}
-        onClose={bookmarks?.hide}
+        onClose={bookmarks.hide}
         onPackage={bucket ? handleSubmit : undefined}
         onRemove={handleRemove}
         onClear={handleClear}
-        open={bookmarks?.isOpened}
+        open={bookmarks.isOpened}
       />
       {createDialog.render({
         successTitle: 'Package created',

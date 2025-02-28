@@ -76,6 +76,8 @@ or an object with one or more of the following properties:
     - `["perspective"]` to render tabular data (csv, xlsx etc.) with Perspective
     - `["igv"]` to render JSON with Integrative Genomics Viewer
     - `["voila"]` to render a Jupyter notebook as an interactive Voila dashboard
+    - `["html"]` to render HTML in iframes. See also [Advanced HTML rendering](./Preview.md#advanced-html-rendering-and-quilt-package-file-server)
+    - `["text"]` to render anything as text with syntax highlighting
 
 If you need to control the height of an element (useful for Voila dashboards),
 use the following extended syntax:
@@ -97,6 +99,34 @@ use the following extended syntax:
 
 At present `height` is the only supported `style` element.
 
+> Limitations:
+> * Objects linked via `quilt_summarize.json` are always the
+>   **latest** version, even when browsing an older package version.
+> * Object titles and image thumbnails link to the file view, even in
+>   the package view.
+
+## Images
+
+If your Amazon S3 bucket contains images, by default the Quilt 
+Catalog displays a preview of those images _before_ any 
+`quilt_summarize.json`-referenced files.
+
+In the **Overview** tab, the Catalog parses the entire Amazon S3 
+bucket contents and displays thumbnail image previews in a 
+paginated grid (25 per page by default) of 
+all [supported image types](../Catalog/Preview.md#binary-and-special-file-format-previews).
+
+> To hide this block, use the `gallery` field in
+your [bucket preferences](./Preferences.md) file.
+
+In the **Bucket** tab, the Catalog displays thumbnail image 
+previews in a similarly paginated grid but _only from the current 
+directory viewed_.
+
+In the **Packages** tab, when a specific package has been 
+opened the Catalog displays thumbnail image previews in a 
+similarly paginated grid but _only those image files in the selected package_.
+
 ## Vega and Vega-lite
 The Quilt catalog uses [vega-embed](https://github.com/vega/vega-embed) to render
 [vega](https://vega.github.io/vega/) and [vega-lite](https://vega.github.io/vega-lite/) visualizations.
@@ -115,7 +145,20 @@ file with a library-compatible schema in a JSON file as follows in your
 ```
 
 For both Vega and Vega Lite you may specify relative paths to package files
-as data sources and the Quilt catalog will resolve the same.
+as data sources and the Quilt catalog correctly resolves them. Vega treats any
+data source as JSON by default. If you wish to use a different format than JSON, please 
+[specify the file type](https://vega.github.io/vega-lite/docs/data.html#format).
+For example: 
+
+```json
+{
+  "data": {
+    "url": "./datasource.csv",
+    "format": {
+      "type": "csv"
+    }
+}
+```
 
 ### Altair
 The easiest way to create Vega-lite visualizations for Quilt packages is with
@@ -365,8 +408,8 @@ All filters and columns will be restored:
       {
         "name": "perspective",
         "config": {
-          "columns": ["name", "value"],
-          "group_by": ["value"],
+          "columns": ["YOUR_COLUMN_0", "YOUR_COLUMN_1"],
+          "group_by": ["YOUR_COLUMN_1"],
           "settings": true,
           "theme": "Material Light Mono"
         }

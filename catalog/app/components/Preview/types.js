@@ -19,10 +19,9 @@ PreviewStatus: {
 
 export const PreviewData = tagged([
   'Audio', // { src: string }
-  'DataFrame', // { preview: string, ...PreviewStatus }
   'ECharts', // { option: object }
   'Fcs', // { preview: string, metadata: object, ...PreviewStatus }
-  'IFrame', // { src: string }
+  'IFrame', // { src: string, modes, sandbox }
   'Igv', // { options: object }
   'Image', // { handle: object }
   'Json', // { rendered: object }
@@ -50,7 +49,8 @@ export const PreviewError = tagged([
   'DoesNotExist', // { handle }
   'SrcDoesNotExist', // { handle }
   'MalformedJson', // { handle, message }
-  'Unexpected', // { handle, retry, originalError: any }
+  'Expired', // { retry }
+  'Unexpected', // { handle, retry, message, originalError: any }
 ])
 
 export const CONTEXT = {

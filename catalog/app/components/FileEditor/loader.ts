@@ -5,19 +5,18 @@ import * as React from 'react'
 import * as quiltConfigs from 'constants/quiltConfigs'
 import { detect as isMarkdown } from 'components/Preview/loaders/Markdown'
 import * as PreviewUtils from 'components/Preview/loaders/utils'
-import * as AWS from 'utils/AWS'
-import type { S3HandleBase } from 'utils/s3paths'
 import type * as Model from 'model'
+import * as AWS from 'utils/AWS'
 
 import { Mode, EditorInputType } from './types'
 
-const cache: { [index in Mode]?: Promise<void> | 'fullfilled' } = {}
+const cache: { [index in Mode]?: Promise<void> | 'fulfilled' } = {}
 export const loadMode = (mode: Mode) => {
-  if (cache[mode] === 'fullfilled') return cache[mode]
+  if (cache[mode] === 'fulfilled') return cache[mode]
   if (cache[mode]) throw cache[mode]
 
   cache[mode] = import(`brace/mode/${mode}`).then(() => {
-    cache[mode] = 'fullfilled'
+    cache[mode] = 'fulfilled'
   })
   throw cache[mode]
 }
@@ -25,8 +24,21 @@ export const loadMode = (mode: Mode) => {
 const isQuiltConfig = (path: string) =>
   quiltConfigs.all.some((quiltConfig) => quiltConfig.includes(path))
 const typeQuiltConfig: EditorInputType = {
-  title: 'Quilt config helper',
+  title: 'Edit with config helper',
   brace: '__quiltConfig',
+}
+
+const isQuiltSummarize = (path: string) => path.endsWith(quiltConfigs.quiltSummarize)
+const typeQuiltSummarize: EditorInputType = {
+  title: 'Edit with config helper',
+  brace: '__quiltSummarize',
+}
+
+const isBucketPreferences = (path: string) =>
+  quiltConfigs.bucketPreferences.some((quiltConfig) => quiltConfig.includes(path))
+const typeBucketPreferences: EditorInputType = {
+  title: 'Edit with config helper',
+  brace: '__bucketPreferences',
 }
 
 const isCsv = PreviewUtils.extIn(['.csv', '.tsv', '.tab'])
@@ -45,13 +57,11 @@ const typeMarkdown: EditorInputType = {
 
 const isText = PreviewUtils.extIn(['.txt', ''])
 const typeText: EditorInputType = {
-  title: 'Plain text',
   brace: 'plain_text',
 }
 
 const isYaml = PreviewUtils.extIn(['.yaml', '.yml'])
 const typeYaml: EditorInputType = {
-  title: 'YAML',
   brace: 'yaml',
 }
 
@@ -62,6 +72,8 @@ const typeNone: EditorInputType = {
 export const detect: (path: string) => EditorInputType[] = R.pipe(
   PreviewUtils.stripCompression,
   R.cond([
+    [isQuiltSummarize, R.always([typeQuiltSummarize, typeJson])],
+    [isBucketPreferences, R.always([typeBucketPreferences, typeYaml])],
     [isQuiltConfig, R.always([typeQuiltConfig, typeYaml])],
     [isCsv, R.always([typeCsv])],
     [isJson, R.always([typeJson])],
@@ -94,7 +106,7 @@ export function useWriteData({
   bucket,
   key,
   version,
-}: S3HandleBase): (value: string) => Promise<Model.S3File> {
+}: Model.S3.S3ObjectLocation): (value: string) => Promise<Model.S3File> {
   const s3 = AWS.S3.use()
   return React.useCallback(
     async (value) => {

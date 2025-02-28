@@ -1,7 +1,7 @@
 import * as React from 'react'
 import * as M from '@material-ui/core'
 
-import ButtonIconized from 'components/ButtonIconized'
+import * as Buttons from 'components/Buttons'
 import { EditorState } from './State'
 
 interface AddFileButtonProps {
@@ -13,6 +13,26 @@ export function AddFileButton({ onClick }: AddFileButtonProps) {
     <M.Button variant="contained" color="primary" size="large" onClick={onClick}>
       Create file
     </M.Button>
+  )
+}
+
+interface PreviewButtonProps extends EditorState {
+  className?: string
+  onPreview: NonNullable<EditorState['onPreview']>
+}
+
+export function PreviewButton({ className, preview, onPreview }: PreviewButtonProps) {
+  const handleClick = React.useCallback(() => onPreview(!preview), [onPreview, preview])
+  return (
+    <M.FormControlLabel
+      onClick={(event) => event.stopPropagation()}
+      className={className}
+      control={
+        <M.Switch checked={preview} onChange={handleClick} size="small" color="primary" />
+      }
+      label="Preview"
+      labelPlacement="end"
+    />
   )
 }
 
@@ -52,7 +72,7 @@ export function Controls({
   if (!editing)
     return (
       <>
-        <ButtonIconized
+        <Buttons.Iconized
           className={className}
           disabled={disabled}
           icon="edit"
@@ -63,7 +83,7 @@ export function Controls({
           <M.Menu open={!!anchorEl} anchorEl={anchorEl} onClose={() => setAnchorEl(null)}>
             {types.map((type) => (
               <M.MenuItem onClick={() => handleTypeClick(type)} key={type.brace}>
-                Edit as {type.title || type.brace}
+                {type.title || 'Edit file'}
               </M.MenuItem>
             ))}
           </M.Menu>
@@ -72,8 +92,8 @@ export function Controls({
     )
   return (
     <M.ButtonGroup disabled={disabled} className={className} size="small">
-      <ButtonIconized icon="undo" onClick={onCancel} label="Cancel" />
-      <ButtonIconized
+      <Buttons.Iconized icon="undo" onClick={onCancel} label="Cancel" />
+      <Buttons.Iconized
         color="primary"
         icon="save"
         label="Save"
